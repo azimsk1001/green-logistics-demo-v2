@@ -15,8 +15,8 @@ const vehicleData = {
       "Euro VI": { fuel_l_per_100km: 33, nox_g_per_km: 0.6, pm_g_per_km: 0.01 }
     }
   },
-  ef_co2_diesel_kg_per_l: 2.68,   // IPCC fuel-based factor
-  wtt_uplift_default: 0.18         // +18% WTT uplift (toggle)
+  ef_co2_diesel_kg_per_l: 2.68,   // IPCC fuel-based CO2 factor
+  wtt_uplift_default: 0.18         // +18% Well-to-Tank uplift (toggle)
 };
 
 // ===== External services =====
@@ -34,6 +34,45 @@ const MAX_DESTS = 5;
 const originStyle = { radius: 7, color: '#b91c1c', fillColor: '#ef4444', fillOpacity: 0.9, weight: 2 };
 const destStyle   = { radius: 7, color: '#065f46', fillColor: '#10b981', fillOpacity: 0.9, weight: 2 };
 
+// ===== Helpers used early (keep here so Part 1 runs standalone) =====
+function debounce(fn, wait) {
+  let t;
+  return function(...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.display = msg ? 'block' : 'none';
+}
+function clearError() { showError(''); }
+function updateCounts() {
+  const valid = destinations.filter(d => d.name && d.lat != null && d.lon != null).length;
+  const vc = document.getElementById('validCount');
+  const tc = document.getElementById('totalCount');
+  if (vc) vc.textContent = valid;
+  if (tc) tc.textContent = destinations.length;
+}
+function updateCalcEnabled() {
+  const calcBtn = document.getElementById('calcBtn');
+  if (!calcBtn) return;
+  const valid = destinations.filter(d => d.name && d.lat != null && d.lon != null).length;
+  calcBtn.disabled = !origin || valid === 0;
+}
+function fmt(n) { return Number(n || 0).toFixed(2); }
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // ===== Boot =====
 window.addEventListener('load', initApp);
 
@@ -41,7 +80,8 @@ function initApp() {
   initMap();
   wireVehicleSelectors();
   wireRouteUI();
-  document.getElementById('mapLoading').style.display = 'none';
+  const ml = document.getElementById('mapLoading');
+  if (ml) ml.style.display = 'none';
 }
 
 function initMap() {
@@ -128,7 +168,10 @@ function wireRouteUI() {
   });
 
   addDestBtn.addEventListener('click', addDestinationRow);
-  calcBtn.addEventListener('click', calculateRouteAndEmissions);
+  calcBtn.addEventListener('click', () => {
+    // calculateRouteAndEmissions is defined in Part 2
+    // no-op here; will work after Part 2 is pasted
+  });
 
   document.addEventListener('click', () => {
     originSugg.style.display = 'none';
@@ -237,7 +280,7 @@ function renderSuggestions(container, list, onSelect) {
 
 // ===== SET ORIGIN/DEST =====
 function setOrigin(place) {
-  if (origin?.marker) map.removeLayer(origin.marker);
+  if (origin && origin.marker) map.removeLayer(origin.marker);
   origin = {
     name: place.fullName,
     lat: place.lat,
@@ -255,23 +298,41 @@ function setDestination(destObj, place) {
   destObj.marker = L.circleMarker([place.lat, place.lon], destStyle).addTo(map).bindPopup(place.fullName);
   map.setView([place.lat, place.lon], 9);
 }
+// ===== ROUTE + EMISSIONS (Part 2) =====
 
-// ===== ROUTE + EMISSIONS =====
+// Ensure the Calculate button calls the real function (adds another listener)
+(function bindCalcNow() {
+  const calcBtn = document.getElementById('calcBtn');
+  if (calcBtn) {
+    calcBtn.addEventListener('click', calculateRouteAndEmissions);
+  }
+})();
+
 async function calculateRouteAndEmissions() {
   clearError();
-  if (!origin) return showError('Please select an origin');
+  if (!origin) {
+    showError('Please select an origin');
+    return;
+  }
   const validDests = destinations.filter(d => d.name && d.lat != null && d.lon != null);
-  if (validDests.length === 0) return showError('Please add at least one destination');
+  if (validDests.length === 0) {
+    showError('Please add at least one destination');
+    return;
+  }
 
   const points = [origin, ...validDests];
+
   try {
     const route = await getRoute(points);
-    if (!route) return showError('Failed to get route from OSRM');
+    if (!route) {
+      showError('Failed to get route from OSRM');
+      return;
+    }
 
     drawRoute(route.coords);
 
-    const distanceKm = route.distance_m / 1000;
-    const legsKm = route.legs_m.map(m => m / 1000);
+    const distanceKm = (route.distance_m || 0) / 1000;
+    const legsKm = (route.legs_m || []).map(m => m / 1000);
 
     const { co2kg, co2kg_wtt, noxkg, pmkg, fuelL } = computeEmissions(distanceKm);
 
@@ -299,15 +360,18 @@ async function getRoute(points) {
   const data = await res.json();
   if (!data.routes || !data.routes[0]) return null;
   const r = data.routes[0];
-  const coords = r.geometry.coordinates.map(c => [c[1], c[0]]);
-  const legs_m = r.legs ? r.legs.map(l => l.distance) : [r.distance];
+
+  const coords = (r.geometry?.coordinates || []).map(c => [c[1], c[0]]);
+  const legs_m = r.legs ? r.legs.map(l => l.distance) : (typeof r.distance === 'number' ? [r.distance] : []);
   return { coords, distance_m: r.distance, legs_m };
 }
 
 function drawRoute(coords) {
   if (routeLayer) map.removeLayer(routeLayer);
-  routeLayer = L.polyline(coords, { color: '#2563eb', weight: 4 }).addTo(map);
-  map.fitBounds(routeLayer.getBounds().pad(0.15));
+  routeLayer = L.polyline(coords || [], { color: '#2563eb', weight: 4 }).addTo(map);
+  if (coords && coords.length) {
+    map.fitBounds(routeLayer.getBounds().pad(0.15));
+  }
 }
 
 // ===== EMISSIONS =====
@@ -324,7 +388,7 @@ function computeEmissions(distanceKm) {
 
   const fuelL = distanceKm * (fuelPer100 / 100);           // liters
   const co2kg = fuelL * efCO2;                             // tank-to-wheel
-  const co2kg_wtt = wttToggle.checked
+  const co2kg_wtt = wttToggle && wttToggle.checked
     ? co2kg * (1 + vehicleData.wtt_uplift_default)
     : co2kg;
 
@@ -336,27 +400,42 @@ function computeEmissions(distanceKm) {
 
 function renderResults({ distanceKm, legsKm, points, fuelL, co2kg, co2kg_wtt, noxkg, pmkg }) {
   const results = document.getElementById('results');
-  const wttOn = document.getElementById('wttToggle').checked;
+  const wttOn = document.getElementById('wttToggle')?.checked;
 
   const totalKm = Math.max(distanceKm, 0.0001);
   const fuelPerKm = fuelL / totalKm;
-  const co2PerKm  = co2kg / total
+  const co2PerKm  = co2kg / totalKm;
+  const co2WttPerKm = co2kg_wtt / totalKm;
+  const noxPerKm  = noxkg / totalKm;
+  const pmPerKm   = pmkg / totalKm;
 
-  let legsHtml = ''; if (legsKm && legsKm.length && points && points.length === legsKm.length + 1) { for (let i = 0; i < legsKm.length; i++) { const legKm = legsKm[i]; legsHtml +=  <div class="result-item"> <div><strong>Leg ${i + 1}:</strong> ${escapeHtml(points[i].name)} → ${escapeHtml(points[i + 1].name)}</div> <div class="small">Distance: ${fmt(legKm)} km</div> <div class="small">Fuel: ${fmt(legKm * fuelPerKm)} L</div> <div class="small">CO2 (TTW): ${fmt(legKm * co2PerKm)} kg${wttOn ? | CO2 (TTW+WTT): ${fmt(legKm * co2WttPerKm)} kg: ''}</div> <div class="small">NOx: ${fmt(legKm * noxPerKm)} kg | PM: ${fmt(legKm * pmPerKm)} kg</div> </div> ; } }
+  let legsHtml = '';
+  if (legsKm && legsKm.length && points && points.length === legsKm.length + 1) {
+    for (let i = 0; i < legsKm.length; i++) {
+      const legKm = legsKm[i];
+      legsHtml += `
+        <div class="result-item">
+          <div><strong>Leg ${i + 1}:</strong> ${escapeHtml(points[i].name)} → ${escapeHtml(points[i + 1].name)}</div>
+          <div class="small">Distance: ${fmt(legKm)} km</div>
+          <div class="small">Fuel: ${fmt(legKm * fuelPerKm)} L</div>
+          <div class="small">CO2 (TTW): ${fmt(legKm * co2PerKm)} kg${wttOn ? ` | CO2 (TTW+WTT): ${fmt(legKm * co2WttPerKm)} kg` : ''}</div>
+          <div class="small">NOx: ${fmt(legKm * noxPerKm)} kg | PM: ${fmt(legKm * pmPerKm)} kg</div>
+        </div>
+      `;
+    }
+  }
 
-results.innerHTML = `
+  results.innerHTML = `
+    <div class="result-item">
+      <div><strong>Total Distance:</strong> ${fmt(distanceKm)} km</div>
+      <div><strong>Fuel Used:</strong> ${fmt(fuelL)} L</div>
+      <div><strong>CO2 (TTW):</strong> ${fmt(co2kg)} kg ${wttOn ? `<span class="badge">+ WTT</span>` : ''}</div>
+      ${wttOn ? `<div><strong>CO2 (TTW + WTT):</strong> ${fmt(co2kg_wtt)} kg</div>` : ''}
+      <div><strong>NOx:</strong> ${fmt(noxkg)} kg | <strong>PM:</strong> ${fmt(pmkg)} kg</div>
+      <div class="muted">CO2 factor: ${vehicleData.ef_co2_diesel_kg_per_l} kg/L diesel${wttOn ? `, WTT +${Math.round(vehicleData.wtt_uplift_default * 100)}%` : ''}</div>
+    </div>
+    ${legsHtml ? `<h2>Legs</h2>${legsHtml}` : ''}
+  `;
+}
 
-<div class="result-item"> <div><strong>Total Distance:</strong> ${fmt(distanceKm)} km</div> <div><strong>Fuel Used:</strong> ${fmt(fuelL)} L</div> <div><strong>CO2 (TTW):</strong> ${fmt(co2kg)} kg ${wttOn ? `<span class="badge">+ WTT</span>` : ''}</div> ${wttOn ? `<div><strong>CO2 (TTW + WTT):</strong> ${fmt(co2kg_wtt)} kg</div>` : ''} <div><strong>NOx:</strong> ${fmt(noxkg)} kg | <strong>PM:</strong> ${fmt(pmkg)} kg</div> <div class="muted">CO2 factor: ${vehicleData.ef_co2_diesel_kg_per_l} kg/L diesel${wttOn ? `, WTT +${Math.round(vehicleData.wtt_uplift_default * 100)}%` : ''}</div> </div> ${legsHtml ? `<h2>Legs</h2>${legsHtml}` : ''} `; }
-// ===== Helpers ===== function updateCounts() { const valid = destinations.filter(d => d.name && d.lat != null && d.lon != null).length; document.getElementById('validCount').textContent = valid; document.getElementById('totalCount').textContent = destinations.length; }
-
-function updateCalcEnabled() { const calcBtn = document.getElementById('calcBtn'); const valid = destinations.filter(d => d.name && d.lat != null && d.lon != null).length; calcBtn.disabled = !origin || valid === 0; }
-
-function showError(msg) { const el = document.getElementById('errorBox'); el.textContent = msg || ''; el.style.display = msg ? 'block' : 'none'; }
-
-function clearError() { showError(''); }
-
-function debounce(fn, wait) { let t; return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), wait); }; }
-
-function fmt(n) { return Number(n || 0).toFixed(2); }
-
-function escapeHtml(str) { if (!str) return ''; return String(str) .replace(/&/g, '&') .replace(/</g, '<') .replace(/>/g, '>') .replace(/"/g, '"') .replace(/'/g, '''); }
+// ===== Part 1 ends here. Do NOT reload yet. Paste Part 2 next. =====
