@@ -341,3 +341,22 @@ function renderResults({ distanceKm, legsKm, points, fuelL, co2kg, co2kg_wtt, no
   const totalKm = Math.max(distanceKm, 0.0001);
   const fuelPerKm = fuelL / totalKm;
   const co2PerKm  = co2kg / total
+
+  let legsHtml = ''; if (legsKm && legsKm.length && points && points.length === legsKm.length + 1) { for (let i = 0; i < legsKm.length; i++) { const legKm = legsKm[i]; legsHtml +=  <div class="result-item"> <div><strong>Leg ${i + 1}:</strong> ${escapeHtml(points[i].name)} → ${escapeHtml(points[i + 1].name)}</div> <div class="small">Distance: ${fmt(legKm)} km</div> <div class="small">Fuel: ${fmt(legKm * fuelPerKm)} L</div> <div class="small">CO2 (TTW): ${fmt(legKm * co2PerKm)} kg${wttOn ? | CO2 (TTW+WTT): ${fmt(legKm * co2WttPerKm)} kg: ''}</div> <div class="small">NOx: ${fmt(legKm * noxPerKm)} kg | PM: ${fmt(legKm * pmPerKm)} kg</div> </div> ; } }
+
+results.innerHTML = `
+
+<div class="result-item"> <div><strong>Total Distance:</strong> ${fmt(distanceKm)} km</div> <div><strong>Fuel Used:</strong> ${fmt(fuelL)} L</div> <div><strong>CO2 (TTW):</strong> ${fmt(co2kg)} kg ${wttOn ? `<span class="badge">+ WTT</span>` : ''}</div> ${wttOn ? `<div><strong>CO2 (TTW + WTT):</strong> ${fmt(co2kg_wtt)} kg</div>` : ''} <div><strong>NOx:</strong> ${fmt(noxkg)} kg | <strong>PM:</strong> ${fmt(pmkg)} kg</div> <div class="muted">CO2 factor: ${vehicleData.ef_co2_diesel_kg_per_l} kg/L diesel${wttOn ? `, WTT +${Math.round(vehicleData.wtt_uplift_default * 100)}%` : ''}</div> </div> ${legsHtml ? `<h2>Legs</h2>${legsHtml}` : ''} `; }
+// ===== Helpers ===== function updateCounts() { const valid = destinations.filter(d => d.name && d.lat != null && d.lon != null).length; document.getElementById('validCount').textContent = valid; document.getElementById('totalCount').textContent = destinations.length; }
+
+function updateCalcEnabled() { const calcBtn = document.getElementById('calcBtn'); const valid = destinations.filter(d => d.name && d.lat != null && d.lon != null).length; calcBtn.disabled = !origin || valid === 0; }
+
+function showError(msg) { const el = document.getElementById('errorBox'); el.textContent = msg || ''; el.style.display = msg ? 'block' : 'none'; }
+
+function clearError() { showError(''); }
+
+function debounce(fn, wait) { let t; return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), wait); }; }
+
+function fmt(n) { return Number(n || 0).toFixed(2); }
+
+function escapeHtml(str) { if (!str) return ''; return String(str) .replace(/&/g, '&') .replace(/</g, '<') .replace(/>/g, '>') .replace(/"/g, '"') .replace(/'/g, '''); }
