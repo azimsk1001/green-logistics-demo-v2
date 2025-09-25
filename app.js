@@ -318,9 +318,9 @@ function addDestinationRow() {
       inputEl.addEventListener('input', debounce(async () => {
   const list = await searchPlaces(inputEl.value);
   renderSuggestions(suggEl, list, place => {
-    setDestination(...);
-  });
-}, 300));
+    setDestination(...); 
+  });300));
+},
 
 
   inputEl.addEventListener('focus', () => {
