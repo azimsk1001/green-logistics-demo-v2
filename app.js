@@ -315,13 +315,13 @@ function addDestinationRow() {
     const list = await searchPlaces(inputEl.value);
     renderSuggestions(suggEl, list, place => {
       setDestination(destObj, place);
-      inputEl.value = place.fullName;
-      selectedEl.textContent = `Selected: ${place.name}`;
-      suggEl.style.display = 'none';
-      updateCounts();
-      updateCalcEnabled();
-    });
-  }, 300));
+      inputEl.addEventListener('input', debounce(async () => {
+  const list = await searchPlaces(inputEl.value);
+  renderSuggestions(suggEl, list, place => {
+    setDestination(...);
+  });
+}, 300));
+
 
   inputEl.addEventListener('focus', () => {
     if (inputEl.value.length >= 2) inputEl.dispatchEvent(new Event('input'));
