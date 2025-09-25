@@ -94,7 +94,7 @@ function wireExportButtons() {
 }
 
 // ===== Export helpers =====
- function exportJSON() { if (!lastReport) return; const blob = new Blob([JSON.stringify(lastReport, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); triggerDownload(url, makeFileName('route_report', 'json')); }
+function exportJSON() { if (!lastReport) return; const blob = new Blob([JSON.stringify(lastReport, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); triggerDownload(url, makeFileName('route_report', 'json')); }
 
 function exportCSV() { if (!lastReport) return; const r = lastReport; const lines = [];
 
@@ -110,7 +110,8 @@ function triggerDownload(url, filename) { const a = document.createElement('a');
 
 function makeFileName(base, ext) { const ts = new Date().toISOString().replace(/[:.]/g, '-'); return ${base}_${ts}.${ext}; }
 
-function csvEscape(s) { if (s == null) return ''; const str = String(s); if (/[",\n]/.test(str)) { return "${str.replace(/"/g, '""')}"; } return str; }
+function csvEscape(s) { if (s == null) return ''; const str = String(s); if (/[",\n]/.test(str)) { return "${str.replace(/"/g, '""')}"; } return str; 
+  }
 
   // ===== Boot =====
 window.addEventListener('load', initApp);
@@ -450,4 +451,5 @@ results.innerHTML =  <div class="result-item"> <div><strong>Total Distance:</str
 
 lastReport = { timestamp: new Date().toISOString(), vehicle: { model, euro }, inputs: { fuel_l_per_100km_base: fuelBase, nox_g_per_km_base: noxBase, pm_g_per_km_base: pmBase, wtt_on: wttOnVal, load_kg: loadKg, fuel_factor: fuelFactor, nox_factor: noxFactor }, route: { total_distance_km: distanceKm, legs_km: legsKm, points: points.map(p => p.name) }, totals: { fuel_l: fuelL, co2_ttw_kg: co2kg, co2_ttw_wtt_kg: co2kg_wtt, nox_kg: noxkg, pm_kg: pmkg } };
 
-// Enable export buttons const csvBtn = document.getElementById('exportCsv'); const jsonBtn = document.getElementById('exportJson'); if (csvBtn) csvBtn.disabled = false; if (jsonBtn) jsonBtn.disabled = false; }
+// Enable export buttons const csvBtn = document.getElementById('exportCsv'); const jsonBtn = document.getElementById('exportJson'); if (csvBtn) csvBtn.disabled = false; if (jsonBtn) jsonBtn.disabled = false; 
+                                                                                                                            }
