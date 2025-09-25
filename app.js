@@ -311,16 +311,17 @@ function addDestinationRow() {
   const destObj = { id, name: null, lat: null, lon: null, marker: null, inputEl, suggEl, selectedEl, box };
 
   // Destination search + select
-  inputEl.addEventListener('input', debounce(async () => {
-    const list = await searchPlaces(inputEl.value);
-    renderSuggestions(suggEl, list, place => {
-      setDestination(destObj, place);
-      inputEl.addEventListener('input', debounce(async () => {
+ inputEl.addEventListener('input', debounce(async () => {
   const list = await searchPlaces(inputEl.value);
   renderSuggestions(suggEl, list, place => {
-    setDestination(...); 
-  });300));
-},
+    setDestination(destObj, place);
+    inputEl.value = place.fullName;
+    selectedEl.textContent = `Selected: ${place.name}`;
+    suggEl.style.display = 'none';
+    updateCounts();
+    updateCalcEnabled();
+  });
+}, 300));
 
 
   inputEl.addEventListener('focus', () => {
