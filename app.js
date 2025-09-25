@@ -252,6 +252,7 @@ function wireRouteUI() {
   const addDestBtn  = document.getElementById('addDest');
   const calcBtn     = document.getElementById('calcBtn');
 
+  // Origin search + select
   originInput.addEventListener('input', debounce(async () => {
     const list = await searchPlaces(originInput.value);
     renderSuggestions(originSugg, list, place => {
@@ -267,9 +268,13 @@ function wireRouteUI() {
     if (originInput.value.length >= 2) originInput.dispatchEvent(new Event('input'));
   });
 
+  // Add destination row
   addDestBtn.addEventListener('click', addDestinationRow);
+
+  // Calculate button
   calcBtn.addEventListener('click', calculateRouteAndEmissions);
 
+  // Click outside to close suggestion lists
   document.addEventListener('click', () => {
     originSugg.style.display = 'none';
     destinations.forEach(d => d.suggEl.style.display = 'none');
@@ -279,23 +284,104 @@ function wireRouteUI() {
   updateCalcEnabled();
 }
 
-function addDestinationRow() { if (destinations.length >= MAX_DESTS) { showError('Maximum 5 destinations allowed'); return; } const id = destIdSeq++; const destContainer = document.getElementById('destContainer');
+function addDestinationRow() {
+  if (destinations.length >= MAX_DESTS) {
+    showError('Maximum 5 destinations allowed');
+    return;
+  }
+  const id = destIdSeq++;
+  const destContainer = document.getElementById('destContainer');
 
-const box = document.createElement('div'); box.className = 'dest-box'; box.innerHTML =  <div class="input-wrapper" style="position:relative;"> <input type="text" placeholder="e.g., Singapore" autocomplete="off"/> <div class="suggestions"></div> </div> <div class="small"></div> <button class="remove">Remove</button> ;
+  const box = document.createElement('div');
+  box.className = 'dest-box';
+  box.innerHTML = `
+    <div class="input-wrapper" style="position:relative;">
+      <input type="text" placeholder="e.g., Singapore" autocomplete="off"/>
+      <div class="suggestions"></div>
+    </div>
+    <div class="small"></div>
+    <button class="remove">Remove</button>
+  `;
 
-const inputEl = box.querySelector('input'); const suggEl = box.querySelector('.suggestions'); const selectedEl = box.querySelector('.small'); const removeBtn = box.querySelector('.remove');
+  const inputEl = box.querySelector('input');
+  const suggEl  = box.querySelector('.suggestions');
+  const selectedEl = box.querySelector('.small');
+  const removeBtn  = box.querySelector('.remove');
 
-const destObj = { id, name: null, lat: null, lon: null, marker: null, inputEl, suggEl, selectedEl, box };
+  const destObj = { id, name: null, lat: null, lon: null, marker: null, inputEl, suggEl, selectedEl, box };
 
-inputEl.addEventListener('input', debounce(async () => { const list = await searchPlaces(inputEl.value); renderSuggestions(suggEl, list, place => { setDestination(destObj, place); inputEl.value = place.fullName; selectedEl.textContent = Selected: ${place.name}; suggEl.style.display = 'none'; updateCounts(); updateCalcEnabled(); }); }, 300));
+  // Destination search + select
+  inputEl.addEventListener('input', debounce(async () => {
+    const list = await searchPlaces(inputEl.value);
+    renderSuggestions(suggEl, list, place => {
+      setDestination(destObj, place);
+      inputEl.value = place.fullName;
+      selectedEl.textContent = `Selected: ${place.name}`;
+      suggEl.style.display = 'none';
+      updateCounts();
+      updateCalcEnabled();
+    });
+  }, 300));
 
-inputEl.addEventListener('focus', () => { if (inputEl.value.length >= 2) inputEl.dispatchEvent(new Event('input')); });
+  inputEl.addEventListener('focus', () => {
+    if (inputEl.value.length >= 2) inputEl.dispatchEvent(new Event('input'));
+  });
 
-// Keep suggestions open only when interacting with them suggEl.addEventListener('click', e => e.stopPropagation());
+  // Keep suggestions open only when interacting with them
+  suggEl.addEventListener('click', e => e.stopPropagation());
 
-removeBtn.addEventListener('click', () => { if (destObj.marker) map.removeLayer(destObj.marker); const idx = destinations.findIndex(d => d.id === id); if (idx > -1) destinations.splice(idx, 1); box.remove(); updateCounts(); updateCalcEnabled(); });
+  // Remove destination row
+  removeBtn.addEventListener('click', () => {
+    if (destObj.marker) map.removeLayer(destObj.marker);
+    const idx = destinations.findIndex(d => d.id === id);
+    if (idx > -1) destinations.splice(idx, 1);
+    box.remove();
+    updateCounts();
+    updateCalcEnabled();
+  });
 
-destinations.push(destObj); destContainer.appendChild(box); updateCounts(); }
+  destinations.push(destObj);
+  destContainer.appendChild(box);
+  updateCounts();
+}
+
+// ===== SEARCH/SUGGESTIONS =====
+async function searchPlaces(query) {
+  if (!query || query.length < 2) return [];
+  const url = `${NOMINATIM_URL}?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`;
+  try {
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const data = await res.json();
+    return data.map(item => ({
+      name: item.display_name.split(',')[0],
+      fullName: item.display_name,
+      lat: parseFloat(item.lat),
+      lon: parseFloat(item.lon)
+    }));
+  } catch (e) {
+    console.error('Search error:', e);
+    return [];
+  }
+}
+
+function renderSuggestions(container, list, onSelect) {
+  container.innerHTML = '';
+  if (!list || list.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  list.forEach(place => {
+    const div = document.createElement('div');
+    div.className = 'suggestion';
+    div.textContent = place.fullName;
+    div.addEventListener('click', e => {
+      e.stopPropagation();
+      onSelect(place);
+    });
+    container.appendChild(div);
+  });
+  container.style.display = 'block';
+}
 
 // ===== SEARCH/SUGGESTIONS =====
 async function searchPlaces(query) {
