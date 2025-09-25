@@ -314,7 +314,7 @@ function addDestinationRow() {
       suggEl.style.display = 'none';
       updateCounts();
       updateCalcEnabled();
-  }, 300));
+  }), 300));
 
   inputEl.addEventListener('focus', () => {
     if (inputEl.value.length >= 2) inputEl.dispatchEvent(new Event('input'));
