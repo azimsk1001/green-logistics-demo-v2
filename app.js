@@ -245,45 +245,6 @@ function wireVehicleSelectors() {
 }
 
 // ===== ROUTE UI =====
-function wireRouteUI() {
-  const originInput = document.getElementById('originInput');
-  const originSugg  = document.getElementById('originSuggestions');
-  const originSelected = document.getElementById('originSelected');
-  const addDestBtn  = document.getElementById('addDest');
-  const calcBtn     = document.getElementById('calcBtn');
-
-  // Origin search + select
-  originInput.addEventListener('input', debounce(async () => {
-    const list = await searchPlaces(originInput.value);
-    renderSuggestions(originSugg, list, place => {
-      setOrigin(place);
-      originInput.value = place.fullName;
-      originSelected.textContent = `Selected: ${place.name}`;
-      originSugg.style.display = 'none';
-      updateCalcEnabled();
-    });
-  }, 300));
-
-  originInput.addEventListener('focus', () => {
-    if (originInput.value.length >= 2) originInput.dispatchEvent(new Event('input'));
-  });
-
-  // Add destination row
-  addDestBtn.addEventListener('click', addDestinationRow);
-
-  // Calculate button
-  calcBtn.addEventListener('click', calculateRouteAndEmissions);
-
-  // Click outside to close suggestion lists
-  document.addEventListener('click', () => {
-    originSugg.style.display = 'none';
-    destinations.forEach(d => d.suggEl.style.display = 'none');
-  });
-
-  updateCounts();
-  updateCalcEnabled();
-}
-
 function addDestinationRow() {
   if (destinations.length >= MAX_DESTS) {
     showError('Maximum 5 destinations allowed');
@@ -301,7 +262,7 @@ function addDestinationRow() {
     </div>
     <div class="small"></div>
     <button class="remove">Remove</button>
-  `;
+  `;  // <--- Add this closing backtick and semicolon
 
   const inputEl = box.querySelector('input');
   const suggEl  = box.querySelector('.suggestions');
@@ -310,28 +271,24 @@ function addDestinationRow() {
 
   const destObj = { id, name: null, lat: null, lon: null, marker: null, inputEl, suggEl, selectedEl, box };
 
-  // Destination search + select
- inputEl.addEventListener('input', debounce(async () => {
-  const list = await searchPlaces(inputEl.value);
-  renderSuggestions(suggEl, list, place => {
-    setDestination(destObj, place);
-    inputEl.value = place.fullName;
-    selectedEl.textContent = `Selected: ${place.name}`;
-    suggEl.style.display = 'none';
-    updateCounts();
-    updateCalcEnabled();
-  });
-}, 300));
-
+  inputEl.addEventListener('input', debounce(async () => {
+    const list = await searchPlaces(inputEl.value);
+    renderSuggestions(suggEl, list, place => {
+      setDestination(destObj, place);
+      inputEl.value = place.fullName;
+      selectedEl.textContent = `Selected: ${place.name}`;
+      suggEl.style.display = 'none';
+      updateCounts();
+      updateCalcEnabled();
+    });
+  }, 300));
 
   inputEl.addEventListener('focus', () => {
     if (inputEl.value.length >= 2) inputEl.dispatchEvent(new Event('input'));
   });
 
-  // Keep suggestions open only when interacting with them
   suggEl.addEventListener('click', e => e.stopPropagation());
 
-  // Remove destination row
   removeBtn.addEventListener('click', () => {
     if (destObj.marker) map.removeLayer(destObj.marker);
     const idx = destinations.findIndex(d => d.id === id);
@@ -345,6 +302,7 @@ function addDestinationRow() {
   destContainer.appendChild(box);
   updateCounts();
 }
+
 
 // ===== SEARCH/SUGGESTIONS =====
 async function searchPlaces(query) {
