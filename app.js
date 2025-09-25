@@ -307,8 +307,11 @@ function addDestinationRow() {
 
   inputEl.addEventListener('input', debounce(async () => {
     const list = await searchPlaces(inputEl.value);
-  renderSuggestions(suggEl, list, place => { setDestination(destObj, place); inputEl.value = place.fullName; selectedEl.textContent = Selected: ${place.name}; suggEl.style.display = 'none'; updateCounts(); updateCalcEnabled(); });
-});
+    renderSuggestions(suggEl, list, place => {
+      setDestination(destObj, place);
+      inputEl.value = place.fullName;
+      selectedEl.textContent = `Selected: ${place.name}`;
+      suggEl.style.display = 'none';
       updateCounts();
       updateCalcEnabled();
     });
