@@ -94,13 +94,9 @@ function wireExportButtons() {
 }
 
 // ===== Export helpers =====
- function exportJSON() 
- { if (!lastReport) return; const blob = new Blob([JSON.stringify(lastReport, null, 2)], { type: 'application/json' }); 
-  const url = URL.createObjectURL(blob); triggerDownload(url, makeFileName('route_report', 'json')); }
+ function exportJSON() { if (!lastReport) return; const blob = new Blob([JSON.stringify(lastReport, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); triggerDownload(url, makeFileName('route_report', 'json')); }
 
-function exportCSV() 
-{ if (!lastReport) return; const r = lastReport; 
- const lines = [];
+function exportCSV() { if (!lastReport) return; const r = lastReport; const lines = [];
 
 lines.push('Field,Value'); lines.push(Timestamp,${r.timestamp}); lines.push(Vehicle,${csvEscape(r.vehicle.model)} (${csvEscape(r.vehicle.euro)})); lines.push(WTT included,${r.inputs.wtt_on ? 'Yes' : 'No'}); lines.push(Load (kg),${r.inputs.load_kg}); lines.push(Fuel base (L/100km),${r.inputs.fuel_l_per_100km_base}); lines.push(NOx base (g/km),${r.inputs.nox_g_per_km_base}); lines.push(PM base (g/km),${r.inputs.pm_g_per_km_base}); lines.push(Fuel adj factor,${r.inputs.fuel_factor}); lines.push(NOx adj factor,${r.inputs.nox_factor}); lines.push(Total distance (km),${r.route.total_distance_km}); lines.push(Total fuel (L),${r.totals.fuel_l}); lines.push(CO2 TTW (kg),${r.totals.co2_ttw_kg}); lines.push(CO2 TTW+WTT (kg),${r.totals.co2_ttw_wtt_kg}); lines.push(NOx (kg),${r.totals.nox_kg}); lines.push(PM (kg),${r.totals.pm_kg}); lines.push('');
 
@@ -442,38 +438,16 @@ function computeEmissions(distanceKm) {
   return { fuelL, co2kg, co2kg_wtt, noxkg, pmkg, fuelFactor, noxFactor, loadKg };
 }
 
-function renderResults({ distanceKm, legsKm, points, fuelL, co2kg, co2kg_wtt, noxkg, pmkg, fuelFactor, noxFactor, loadKg }) {
-  const results = document.getElementById('results');
-  const wttOn = document.getElementById('wttToggle')?.checked;
+function renderResults({ distanceKm, legsKm, points, fuelL, co2kg, co2kg_wtt, noxkg, pmkg, fuelFactor, noxFactor, loadKg }) { const results = document.getElementById('results'); const wttOn = document.getElementById('wttToggle')?.checked;
 
-  const totalKm = Math.max(distanceKm, 0.0001);
-  const fuelPerKm   = fuelL / totalKm;
-  const co2PerKm    = co2kg / totalKm;
-  const co2WttPerKm = co2kg_wtt / totalKm;
-  const noxPerKm    = noxkg / totalKm;
-  const pmPerKm
-let legsHtml = ''; if (legsKm && legsKm.length && points && points.length === legsKm.length + 1) 
-{ for (let i = 0; i < legsKm.length; i++) 
-{ const legKm = legsKm[i]; legsHtml +=  <div class="result-item"> <div><strong>Leg ${i + 1}:</strong> ${escapeHtml(points[i].name)} → ${escapeHtml(points[i + 1].name)}</div> 
-  <div class="small">Distance: ${fmt(legKm)} km</div> <div class="small">Fuel: ${fmt(legKm * fuelPerKm)} L</div> 
-  <div class="small">CO2 (TTW): ${fmt(legKm * co2PerKm)} kg${wttOn ? | CO2 (TTW+WTT): ${fmt(legKm * co2WttPerKm)} kg: ''}</div> <div class="small">NOx: ${fmt(legKm * noxPerKm)} kg | PM: ${fmt(legKm * pmPerKm)} kg</div> </div> ; } }
+const totalKm = Math.max(distanceKm, 0.0001); const fuelPerKm = fuelL / totalKm; const co2PerKm = co2kg / totalKm; const co2WttPerKm = co2kg_wtt / totalKm; const noxPerKm = noxkg / totalKm; const pmPerKm = pmkg / totalKm;
 
-results.innerHTML = `
+let legsHtml = ''; if (legsKm && legsKm.length && points && points.length === legsKm.length + 1) { for (let i = 0; i < legsKm.length; i++) { const legKm = legsKm[i]; legsHtml +=  <div class="result-item"> <div><strong>Leg ${i + 1}:</strong> ${escapeHtml(points[i].name)} → ${escapeHtml(points[i + 1].name)}</div> <div class="small">Distance: ${fmt(legKm)} km</div> <div class="small">Fuel: ${fmt(legKm * fuelPerKm)} L</div> <div class="small">CO2 (TTW): ${fmt(legKm * co2PerKm)} kg${wttOn ? | CO2 (TTW+WTT): ${fmt(legKm * co2WttPerKm)} kg: ''}</div> <div class="small">NOx: ${fmt(legKm * noxPerKm)} kg | PM: ${fmt(legKm * pmPerKm)} kg</div> </div> ; } }
 
-<div class="result-item"> <div><strong>Total Distance:</strong> 
-${fmt(distanceKm)} km</div> <div><strong>Fuel Used:</strong> 
-${fmt(fuelL)} L</div> <div><strong>CO2 (TTW):</strong> 
-${fmt(co2kg)} kg ${wttOn ? `<span class="badge">+ WTT</span>` : ''}</div> 
-${wttOn ? `<div><strong>CO2 (TTW + WTT):</strong> ${fmt(co2kg_wtt)} kg</div>` : ''} <div><strong>NOx:</strong> 
-${fmt(noxkg)} kg | <strong>PM:</strong> ${fmt(pmkg)} kg</div> <div class="muted">CO2 factor: 
-${vehicleData.ef_co2_diesel_kg_per_l} kg/L diesel${wttOn ? `, WTT +
-${Math.round(vehicleData.wtt_uplift_default * 100)}%` : ''}</div> <div class="muted">Load: 
-${Math.round(loadKg)} kg | Fuel adj: ${((fuelFactor - 1) * 100).toFixed(1)}% | NOx adj: 
-${((noxFactor - 1) * 100).toFixed(1)}%</div> </div>
-${legsHtml ? `<h2>Legs</h2>${legsHtml}` : ''} `;
+results.innerHTML =  <div class="result-item"> <div><strong>Total Distance:</strong> ${fmt(distanceKm)} km</div> <div><strong>Fuel Used:</strong> ${fmt(fuelL)} L</div> <div><strong>CO2 (TTW):</strong> ${fmt(co2kg)} kg ${wttOn ?<span class="badge">+ WTT</span>: ''}</div> ${wttOn ?<div><strong>CO2 (TTW + WTT):</strong> ${fmt(co2kg_wtt)} kg</div>: ''} <div><strong>NOx:</strong> ${fmt(noxkg)} kg | <strong>PM:</strong> ${fmt(pmkg)} kg</div> <div class="muted">CO2 factor: ${vehicleData.ef_co2_diesel_kg_per_l} kg/L diesel${wttOn ?, WTT +${Math.round(vehicleData.wtt_uplift_default * 100)}%: ''}</div> <div class="muted">Load: ${Math.round(loadKg)} kg | Fuel adj: ${((fuelFactor - 1) * 100).toFixed(1)}% | NOx adj: ${((noxFactor - 1) * 100).toFixed(1)}%</div> </div> ${legsHtml ?<h2>Legs</h2>${legsHtml}: ''} ;
+
 // Build lastReport for export const model = document.getElementById('modelSelect')?.value || ''; const euro = document.getElementById('euroSelect')?.value || ''; const fuelBase = parseFloat(document.getElementById('fuelInput')?.value || '0'); const noxBase = parseFloat(document.getElementById('noxInput')?.value || '0'); const pmBase = parseFloat(document.getElementById('pmInput')?.value || '0'); const wttOnVal = !!wttOn;
 
-lastReport = { timestamp: new Date().toISOString(), vehicle: { model, euro },
-              inputs: { fuel_l_per_100km_base: fuelBase, nox_g_per_km_base: noxBase, pm_g_per_km_base: pmBase, wtt_on: wttOnVal, load_kg: loadKg, fuel_factor: fuelFactor, nox_factor: noxFactor }, 
-              route: { total_distance_km: distanceKm, legs_km: legsKm, points: points.map(p => p.name) }, 
-              totals: { fuel_l: fuelL, co2_ttw_kg: co2kg, co2_ttw_wtt_kg: co2kg_wtt, nox_kg: noxkg, pm_kg: pmkg }
+lastReport = { timestamp: new Date().toISOString(), vehicle: { model, euro }, inputs: { fuel_l_per_100km_base: fuelBase, nox_g_per_km_base: noxBase, pm_g_per_km_base: pmBase, wtt_on: wttOnVal, load_kg: loadKg, fuel_factor: fuelFactor, nox_factor: noxFactor }, route: { total_distance_km: distanceKm, legs_km: legsKm, points: points.map(p => p.name) }, totals: { fuel_l: fuelL, co2_ttw_kg: co2kg, co2_ttw_wtt_kg: co2kg_wtt, nox_kg: noxkg, pm_kg: pmkg } };
+
+// Enable export buttons const csvBtn = document.getElementById('exportCsv'); const jsonBtn = document.getElementById('exportJson'); if (csvBtn) csvBtn.disabled = false; if (jsonBtn) jsonBtn.disabled = false; }
