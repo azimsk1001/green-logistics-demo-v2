@@ -311,7 +311,7 @@ function addDestinationRow() {
   setDestination(destObj, place);
   inputEl.value = place.fullName;
   selectedEl.textContent = `Selected: ${place.name}`;
-  suggEl.style.display = 'none';
+  suggEl.style.display ='none';
   updateCounts();
   updateCalcEnabled();
 });
