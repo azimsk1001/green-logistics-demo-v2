@@ -307,7 +307,7 @@ function addDestinationRow() {
 
   inputEl.addEventListener('input', debounce(async () => {
     const list = await searchPlaces(inputEl.value);
-    renderSuggestions(suggEl, list, place => {
+  renderSuggestions(suggEl, list, place => {
   setDestination(destObj, place);
   inputEl.value = place.fullName;
   selectedEl.textContent = `Selected: ${place.name}`;
