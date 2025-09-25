@@ -94,14 +94,12 @@ function wireExportButtons() {
 }
 
 // ===== Export helpers =====
-function exportJSON() {
-  if (!lastReport) return;
-  const blob = new Blob([JSON.stringify(lastReport, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  triggerDownload(url, makeFileName('route_report', 'json'));
-}
+function exportJSON() 
+{ if (!lastReport) return; const blob = new Blob([JSON.stringify(lastReport, null, 2)], { type: 'application/json' }); 
+ const url = URL.createObjectURL(blob); triggerDownload(url, makeFileName('route_report', 'json')); }
 
-exportCSV() { if (!lastReport) return; const r = lastReport; const lines = [];
+function exportCSV()
+  { if (!lastReport) return; const r = lastReport; const lines = [];
 
 lines.push('Field,Value'); lines.push(Timestamp,${r.timestamp}); lines.push(Vehicle,${csvEscape(r.vehicle.model)} (${csvEscape(r.vehicle.euro)})); lines.push(WTT included,${r.inputs.wtt_on ? 'Yes' : 'No'}); lines.push(Load (kg),${r.inputs.load_kg}); lines.push(Fuel base (L/100km),${r.inputs.fuel_l_per_100km_base}); lines.push(NOx base (g/km),${r.inputs.nox_g_per_km_base}); lines.push(PM base (g/km),${r.inputs.pm_g_per_km_base}); lines.push(Fuel adj factor,${r.inputs.fuel_factor}); lines.push(NOx adj factor,${r.inputs.nox_factor}); lines.push(Total distance (km),${r.route.total_distance_km}); lines.push(Total fuel (L),${r.totals.fuel_l}); lines.push(CO2 TTW (kg),${r.totals.co2_ttw_kg}); lines.push(CO2 TTW+WTT (kg),${r.totals.co2_ttw_wtt_kg}); lines.push(NOx (kg),${r.totals.nox_kg}); lines.push(PM (kg),${r.totals.pm_kg}); lines.push('');
 
@@ -111,7 +109,7 @@ lines.push('Field,Value'); lines.push(Timestamp,${r.timestamp}); lines.push(Vehi
 
 const csv = lines.join('\n'); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); triggerDownload(url, makeFileName('route_report', 'csv')); }
 
-Add these helpers once (if not already present) function triggerDownload(url, filename) { const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0); }
+function triggerDownload(url, filename) { const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0); }
 
 function makeFileName(base, ext) { const ts = new Date().toISOString().replace(/[:.]/g, '-'); return ${base}_${ts}.${ext}; }
 
