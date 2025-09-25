@@ -34,6 +34,7 @@ let origin = null; // {name, lat, lon, marker}
 let destinations = []; // [{id, name, lat, lon, marker, inputEl, suggEl, selectedEl, box}]
 let destIdSeq = 1;
 const MAX_DESTS = 5;
+let lastReport = null; // stores latest results for export
 
 // Marker styles
 const originStyle = { radius: 7, color: '#b91c1c', fillColor: '#ef4444', fillOpacity: 0.9, weight: 2 };
@@ -81,13 +82,49 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// ===== Boot =====
+// ===== Export buttons wiring =====
+function wireExportButtons() {
+  const csvBtn = document.getElementById('exportCsv');
+  const jsonBtn = document.getElementById('exportJson');
+  if (!csvBtn || !jsonBtn) return;
+  csvBtn.addEventListener('click', exportCSV);
+  jsonBtn.addEventListener('click', exportJSON);
+  csvBtn.disabled = true;
+  jsonBtn.disabled = true;
+}
+
+// ===== Export helpers =====
+function exportJSON() {
+  if (!lastReport) return;
+  const blob = new Blob([JSON.stringify(lastReport, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  triggerDownload(url, makeFileName('route_report', 'json'));
+}
+
+exportCSV() { if (!lastReport) return; const r = lastReport; const lines = [];
+
+lines.push('Field,Value'); lines.push(Timestamp,${r.timestamp}); lines.push(Vehicle,${csvEscape(r.vehicle.model)} (${csvEscape(r.vehicle.euro)})); lines.push(WTT included,${r.inputs.wtt_on ? 'Yes' : 'No'}); lines.push(Load (kg),${r.inputs.load_kg}); lines.push(Fuel base (L/100km),${r.inputs.fuel_l_per_100km_base}); lines.push(NOx base (g/km),${r.inputs.nox_g_per_km_base}); lines.push(PM base (g/km),${r.inputs.pm_g_per_km_base}); lines.push(Fuel adj factor,${r.inputs.fuel_factor}); lines.push(NOx adj factor,${r.inputs.nox_factor}); lines.push(Total distance (km),${r.route.total_distance_km}); lines.push(Total fuel (L),${r.totals.fuel_l}); lines.push(CO2 TTW (kg),${r.totals.co2_ttw_kg}); lines.push(CO2 TTW+WTT (kg),${r.totals.co2_ttw_wtt_kg}); lines.push(NOx (kg),${r.totals.nox_kg}); lines.push(PM (kg),${r.totals.pm_kg}); lines.push('');
+
+// Route order lines.push('Route order'); r.route.points.forEach((name, i) => { lines.push(${i + 1},${csvEscape(name)}); }); lines.push('');
+
+// Per-leg table (if available) if (r.route.legs_km && r.route.legs_km.length) { lines.push('Leg,From,To,Distance (km)'); for (let i = 0; i < r.route.legs_km.length; i++) { const from = r.route.points[i] || ''; const to = r.route.points[i + 1] || ''; lines.push(${i + 1},${csvEscape(from)},${csvEscape(to)},${r.route.legs_km[i]}); } }
+
+const csv = lines.join('\n'); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); triggerDownload(url, makeFileName('route_report', 'csv')); }
+
+Add these helpers once (if not already present) function triggerDownload(url, filename) { const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0); }
+
+function makeFileName(base, ext) { const ts = new Date().toISOString().replace(/[:.]/g, '-'); return ${base}_${ts}.${ext}; }
+
+function csvEscape(s) { if (s == null) return ''; const str = String(s); if (/[",\n]/.test(str)) { return "${str.replace(/"/g, '""')}"; } return str; }
+
+  // ===== Boot =====
 window.addEventListener('load', initApp);
 
 function initApp() {
   initMap();
   wireVehicleSelectors();
   wireRouteUI();
+  wireExportButtons();
   const ml = document.getElementById('mapLoading');
   if (ml) ml.style.display = 'none';
 }
@@ -330,7 +367,6 @@ async function calculateRouteAndEmissions() {
     const distanceKm = (route.distance_m || 0) / 1000;
     const legsKm = (route.legs_m || []).map(m => m / 1000);
 
-    // Compute emissions (with load scaling) and render
     const em = computeEmissions(distanceKm);
     renderResults({
       distanceKm,
@@ -416,34 +452,4 @@ function renderResults({ distanceKm, legsKm, points, fuelL, co2kg, co2kg_wtt, no
   const co2PerKm    = co2kg / totalKm;
   const co2WttPerKm = co2kg_wtt / totalKm;
   const noxPerKm    = noxkg / totalKm;
-  const pmPerKm     = pmkg / totalKm;
-
-  let legsHtml = '';
-  if (legsKm && legsKm.length && points && points.length === legsKm.length + 1) {
-    for (let i = 0; i < legsKm.length; i++) {
-      const legKm = legsKm[i];
-      legsHtml += `
-        <div class="result-item">
-          <div><strong>Leg ${i + 1}:</strong> ${escapeHtml(points[i].name)} → ${escapeHtml(points[i + 1].name)}</div>
-          <div class="small">Distance: ${fmt(legKm)} km</div>
-          <div class="small">Fuel: ${fmt(legKm * fuelPerKm)} L</div>
-          <div class="small">CO2 (TTW): ${fmt(legKm * co2PerKm)} kg${wttOn ? ` | CO2 (TTW+WTT): ${fmt(legKm * co2WttPerKm)} kg` : ''}</div>
-          <div class="small">NOx: ${fmt(legKm * noxPerKm)} kg | PM: ${fmt(legKm * pmPerKm)} kg</div>
-        </div>
-      `;
-    }
-  }
-
-  results.innerHTML = `
-    <div class="result-item">
-      <div><strong>Total Distance:</strong> ${fmt(distanceKm)} km</div>
-      <div><strong>Fuel Used:</strong> ${fmt(fuelL)} L</div>
-      <div><strong>CO2 (TTW):</strong> ${fmt(co2kg)} kg ${wttOn ? `<span class="badge">+ WTT</span>` : ''}</div>
-      ${wttOn ? `<div><strong>CO2 (TTW + WTT):</strong> ${fmt(co2kg_wtt)} kg</div>` : ''}
-      <div><strong>NOx:</strong> ${fmt(noxkg)} kg | <strong>PM:</strong> ${fmt(pmkg)} kg</div>
-      <div class="muted">CO2 factor: ${vehicleData.ef_co2_diesel_kg_per_l} kg/L diesel${wttOn ? `, WTT +${Math.round(vehicleData.wtt_uplift_default * 100)}%` : ''}</div>
-      <div class="muted">Load: ${Math.round(loadKg)} kg | Fuel adj: ${((fuelFactor - 1) * 100).toFixed(1)}% | NOx adj: ${((noxFactor - 1) * 100).toFixed(1)}%</div>
-    </div>
-    ${legsHtml ? `<h2>Legs</h2>${legsHtml}` : ''}
-  `;
-}
+  const pmPerKm
